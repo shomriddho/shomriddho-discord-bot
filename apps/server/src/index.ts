@@ -7,10 +7,12 @@ import { db } from "@shomriddho-discord-bot/db";
 import { usageMetrics } from "@shomriddho-discord-bot/db/schema";
 import os from "os";
 
-// Get system-wide CPU & RAM usage
-async function getSystemMetrics() {
-  // CPU percentage calculation
-  // os.cpus() gives cumulative times for each core
+/** -----------------------------
+ *  System Metrics Collector
+ *  -----------------------------
+ */
+function getSystemMetrics() {
+  // CPU usage calculation (approximate)
   const cpus = os.cpus();
   let totalIdle = 0;
   let totalTick = 0;
@@ -29,15 +31,53 @@ async function getSystemMetrics() {
   const totalRam = os.totalmem();
   const freeRam = os.freemem();
   const usedRam = totalRam - freeRam;
-  const ramUsedBytes = usedRam;
   const ramPercentage = (usedRam / totalRam) * 100;
 
   return {
     cpuPercentage,
     ramPercentage,
-    ramUsedBytes,
+    ramUsedBytes: usedRam,
   };
 }
+
+/** -----------------------------
+ *  Metrics Interval
+ *  -----------------------------
+ */
+function startMetricsCollection() {
+  const hostId = os.hostname();
+
+  setInterval(async () => {
+    try {
+      const { cpuPercentage, ramPercentage, ramUsedBytes } = getSystemMetrics();
+
+      const timestamp = new Date();
+
+      await db.insert(usageMetrics).values({
+        hostId,
+        timestamp,
+        cpuPercentage,
+        ramPercentage,
+        ramUsedBytes,
+      });
+
+      console.log(
+        `Metrics inserted: CPU ${cpuPercentage.toFixed(
+          2
+        )}%, RAM ${ramPercentage.toFixed(2)}%, Used ${
+          ramUsedBytes / 1_000_000
+        } MB`
+      );
+    } catch (error) {
+      console.error("Error collecting metrics:", error);
+    }
+  }, 5000);
+}
+
+/** -----------------------------
+ *  Hono API Setup
+ *  -----------------------------
+ */
 const app = new Hono();
 
 app.use(logger());
@@ -57,43 +97,24 @@ app.get("/", (c) => {
   });
 });
 
-const port = 3000;
-console.log(`Server is running on http://localhost:${port}`);
-Bun.serve({
-  port,
-  fetch: app.fetch,
-});
+/** -----------------------------
+ *  Bun Main Entry
+ *  -----------------------------
+ */
+if (import.meta.main) {
+  const port = Number(process.env.PORT) || 3000;
 
-initBot();
+  console.log(`Server is running on http://localhost:${port}`);
 
-// Cron job to collect usage metrics every 5 seconds
-const hostId = os.hostname();
+  // Start Bun server
+  Bun.serve({
+    port,
+    fetch: app.fetch,
+  });
 
-setInterval(async () => {
-  try {
-    const { cpuPercentage, ramPercentage, ramUsedBytes } =
-      await getSystemMetrics();
+  // Initialize your bot
+  initBot();
 
-    const timestamp = new Date();
-
-    await db.insert(usageMetrics).values({
-      hostId,
-      timestamp,
-      cpuPercentage,
-      ramPercentage,
-      ramUsedBytes,
-    });
-
-    console.log(
-      `Metrics inserted: CPU ${cpuPercentage.toFixed(
-        2
-      )}%, RAM ${ramPercentage.toFixed(2)}%, Used ${
-        ramUsedBytes / 1_000_000
-      } MB`
-    );
-  } catch (error) {
-    console.error("Error collecting metrics:", error);
-  }
-}, 5000);
-
-export default app;
+  // Start metrics collection
+  startMetricsCollection();
+}
