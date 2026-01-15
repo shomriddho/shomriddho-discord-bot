@@ -12,8 +12,10 @@
   "dependencies": {
     "@shomriddho-discord-bot/db": "workspace:*",
     "@shomriddho-discord-bot/env": "workspace:*",
+    "discord.js": "^14.15.3",
     "dotenv": "catalog:",
     "hono": "^4.8.2",
+    "pidusage": "^4.0.1",
     "zod": "catalog:"
   },
   "devDependencies": {

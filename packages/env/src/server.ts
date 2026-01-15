@@ -6,7 +6,12 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().min(1),
     CORS_ORIGIN: z.url(),
-    NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    NODE_ENV: z
+      .enum(["development", "production", "test"])
+      .default("development"),
+
+    DISCORD_TOKEN: z.string().min(1),
+    DISCORD_CLIENT_ID: z.string().min(1),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
