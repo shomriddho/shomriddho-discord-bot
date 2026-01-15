@@ -7,36 +7,31 @@ import { db } from "@shomriddho-discord-bot/db";
 import { usageMetrics } from "@shomriddho-discord-bot/db/schema";
 import os from "os";
 
+// Import pidusage for accurate process CPU & RAM
+// @ts-ignore
+import pidusage from "pidusage";
+
 /** -----------------------------
- *  System Metrics Collector
+ *  System Metrics Collector (process-based)
  *  -----------------------------
  */
-function getSystemMetrics() {
-  // CPU usage calculation (approximate)
-  const cpus = os.cpus();
-  let totalIdle = 0;
-  let totalTick = 0;
+async function getSystemMetrics() {
+  // Get metrics for THIS process
+  const stats = await pidusage(process.pid);
 
-  cpus.forEach((core) => {
-    const times = core.times;
-    totalIdle += times.idle;
-    totalTick += times.user + times.nice + times.sys + times.irq + times.idle;
-  });
+  const cpuPercentage = stats.cpu; // % CPU used by this process
+  const ramUsedBytes = stats.memory; // RAM in bytes
 
-  const idle = totalIdle / cpus.length;
-  const total = totalTick / cpus.length;
-  const cpuPercentage = 100 - (100 * idle) / total;
-
-  // RAM usage
-  const totalRam = os.totalmem();
-  const freeRam = os.freemem();
-  const usedRam = totalRam - freeRam;
-  const ramPercentage = (usedRam / totalRam) * 100;
+  // RAM percentage relative to container limit (optional)
+  const containerLimitBytes = process.env.CONTAINER_RAM
+    ? Number(process.env.CONTAINER_RAM)
+    : 512 * 1024 * 1024; // default 512MB
+  const ramPercentage = (ramUsedBytes / containerLimitBytes) * 100;
 
   return {
     cpuPercentage,
     ramPercentage,
-    ramUsedBytes: usedRam,
+    ramUsedBytes,
   };
 }
 
@@ -49,7 +44,8 @@ function startMetricsCollection() {
 
   setInterval(async () => {
     try {
-      const { cpuPercentage, ramPercentage, ramUsedBytes } = getSystemMetrics();
+      const { cpuPercentage, ramPercentage, ramUsedBytes } =
+        await getSystemMetrics();
 
       const timestamp = new Date();
 
