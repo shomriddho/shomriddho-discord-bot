@@ -1,0 +1,3 @@
+{
+  "extends": "@shomriddho-discord-bot/config/tsconfig.base.json"
+}
